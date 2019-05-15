@@ -1,0 +1,26 @@
+language: python
+
+addons:
+  apt:
+    update: true
+
+install:
+  - sudo apt-get install -y gnat
+  - git clone https://github.com/ghdl/ghdl.git
+  - mkdir $TRAVIS_BUILD_DIR/ghdl/build
+  - cd $TRAVIS_BUILD_DIR/ghdl/build
+  - $TRAVIS_BUILD_DIR/ghdl/configure --prefix=$TRAVIS_BUILD_DIR/ghdl/
+  - make
+  - make install
+  - pip install vunit_hdl
+  - printf "from vunit import VUnit\nprj = VUnit.from_argv()\nlib = prj.add_library(\"lib\")\nlib.add_source_files(\"./*.vhd\")\nprj.main()" > $TRAVIS_BUILD_DIR/Codice/run.py
+  - chmod +x $TRAVIS_BUILD_DIR/Codice/run.py
+  - export PATH="$TRAVIS_BUILD_DIR/ghdl/bin:$PATH"
+  
+before_script:
+  - cd $TRAVIS_BUILD_DIR/Codice
+  - gcc test_gen.c -o test_gen -std=c99
+  - ./test_gen --random-cases=200
+
+script:
+  - python $TRAVIS_BUILD_DIR/Codice/run.py

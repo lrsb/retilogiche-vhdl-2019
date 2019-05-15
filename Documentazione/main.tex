@@ -1,0 +1,228 @@
+\documentclass[a4paper]{report}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{minted}
+\usepackage{url}
+\usepackage{graphicx}
+
+\begin{document}
+\title{Prova finale (Progetto di Reti Logiche)}
+\date{A.A.: 2018 - 2019}
+\maketitle
+\tableofcontents
+
+\chapter{Specifica}
+Componente {\it HW} per la valutazione di centroidi più vicini ad un centroide di riferimento.
+
+\section{Descrizione}
+Il componente ha il compito di calcolare, dato un centroide, gli $N \leq 8$ centroidi più vicini ad esso.\\
+Lo spazio è costituito da un quadrato 256x256 e le coordinate sono memorizzate in una memoria {\it RAM}, la quale non è parte del progetto.
+Viene inoltre fornita una maschera d'ingresso che serve al filtrare i centroidi in memoria, verranno infatti considerati solo quelli il cui bit corrispondente è settato a 1.\\
+La maschera d'uscita evidenzierà il o i centroidi più vicini, avendo il/i bit corrispondenti ad uno.\\
+Le maschere utilizzano una notazione {\it Little-Endian}.
+\begin{center}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c||c|}
+        \hline
+        $Indirizzo$&$Contenuto$\\
+        \hline
+        0&Maschera in ingresso\\
+        1&Coordianata $x$, centroide $1$\\
+        2&Coordianata $y$, centroide $1$\\
+        3&Coordianata $x$, centroide $2$\\
+        4&Coordianata $y$, centroide $2$\\
+        5&Coordianata $x$, centroide $3$\\
+        6&Coordianata $y$, centroide $3$\\
+        7&Coordianata $x$, centroide $4$\\
+        8&Coordianata $y$, centroide $4$\\
+        9&Coordianata $x$, centroide $5$\\
+        10&Coordianata $y$, centroide $5$\\
+        11&Coordianata $x$, centroide $6$\\
+        12&Coordianata $y$, centroide $6$\\
+        13&Coordianata $x$, centroide $7$\\
+        14&Coordianata $y$, centroide $7$\\
+        15&Coordianata $x$, centroide $8$\\
+        16&Coordianata $y$, centroide $8$\\
+        17&Coordianata $x$, punto da valutare\\
+        18&Coordianata $y$, punto da valutare\\
+        19&Maschera in uscita\\
+        \hline
+    \end{tabular}
+    \caption{Mappa della memoria}
+\end{table}
+\end{center}
+
+\section{Interfaccia}
+Il componente si interfaccia con la memoria tramite $i_-data,\ o_-address,\ o_-en,\ o_-we,\ o_-data$ e con il {\it test bench} tramite $i_-clk,\ i_-start,\ i_-rst$.
+\begin{minted}{vhdl}
+entity project_reti_logiche is
+    port (
+        i_clk, i_start, i_rst : in std_logic;
+        i_data                : in std_logic_vector(7 downto 0);
+        o_address             : out std_logic_vector(15 downto 0);
+        o_done, o_en, o_we    : out std_logic;
+        o_data                : out std_logic_vector(7 downto 0)
+    );
+end entity;
+\end{minted}
+
+\chapter{Implementazione}
+Per implementare la specifica si è scelto di usare una {\it macchina a stati finiti}.
+Si è scelto, inoltre, di sincronizzare le transizioni tra i vari stati sul {\it fronte di discesa} del clock in modo tale da poter eseguire tutte le operazioni in una singola occasione.
+Non sarebbe stato possibile farlo sul fronte di salita in quanto sono presenti dei ritardi nella memoria.
+\newpage
+
+\section{FSM}
+Come poi approfondito in \ref{r_y} la tabella può variare in base alla maschera in ingresso. Qui è riportata quella nel caso peggiore ovvero $Mask\ =$ \texttt{11111111}.
+\begin{center}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|cccc||ccc|}
+        \hline
+        \multicolumn{4}{|c||}{$S$}&\multicolumn{3}{c|}{$S\textsuperscript{*}$}\\
+        \hline
+        \texttt{state}&$step$&$i_-start$&$i_-rst$&\texttt{state}&$step$&$o_-done$\\
+        \hline\hline
+        $-$&$-$&$-$&$1$&\texttt{W\_CLOCK}&$-$&$0$\\
+        \texttt{W\_CLOCK}&$-$&$1$&$0$&\texttt{R\_MASK}&$-$&$0$\\
+        \texttt{R\_MASK}&$-$&$1$&$0$&\texttt{R\_X}&$8$&$0$\\
+        \texttt{R\_X}&$8$&$1$&$0$&\texttt{R\_Y}&$8$&$0$\\
+        \texttt{R\_Y}&$8$&$1$&$0$&\texttt{R\_X}&$0$&$0$\\
+        \texttt{R\_X}&$0$&$1$&$0$&\texttt{R\_Y}&$0$&$0$\\
+        \texttt{R\_Y}&$0$&$1$&$0$&\texttt{R\_X}&$1$&$0$\\
+        \texttt{R\_X}&$1$&$1$&$0$&\texttt{R\_Y}&$1$&$0$\\
+        \texttt{R\_Y}&$1$&$1$&$0$&\texttt{R\_X}&$2$&$0$\\
+        \texttt{R\_X}&$2$&$1$&$0$&\texttt{R\_Y}&$2$&$0$\\
+        \texttt{R\_Y}&$2$&$1$&$0$&\texttt{R\_X}&$3$&$0$\\
+        \texttt{R\_X}&$3$&$1$&$0$&\texttt{R\_Y}&$3$&$0$\\
+        \texttt{R\_Y}&$3$&$1$&$0$&\texttt{R\_X}&$4$&$0$\\
+        \texttt{R\_X}&$4$&$1$&$0$&\texttt{R\_Y}&$4$&$0$\\
+        \texttt{R\_Y}&$4$&$1$&$0$&\texttt{R\_X}&$5$&$0$\\
+        \texttt{R\_X}&$5$&$1$&$0$&\texttt{R\_Y}&$5$&$0$\\
+        \texttt{R\_Y}&$5$&$1$&$0$&\texttt{R\_X}&$6$&$0$\\
+        \texttt{R\_X}&$6$&$1$&$0$&\texttt{R\_Y}&$6$&$0$\\
+        \texttt{R\_Y}&$6$&$1$&$0$&\texttt{R\_X}&$7$&$0$\\
+        \texttt{R\_X}&$7$&$1$&$0$&\texttt{R\_Y}&$7$&$0$\\
+        \texttt{R\_Y}&$7$&$1$&$0$&\texttt{DONE}&$-$&$1$\\
+        \texttt{DONE}&$-$&$0$&$0$&\texttt{W\_CLOCK}&$-$&$0$\\
+        \hline
+    \end{tabular}
+    \caption{Tabella delle transizioni}
+\end{table}
+\end{center}
+
+\subsection{Stato \texttt{FS}}
+Stato iniziale in cui si trova la macchina al primo avvio. La macchina è sensibile solo al segnale di {\it reset} che la porta nello stato \texttt{W\_CLOCK}. Inoltre esso imposterà le uscite del componente in modo che sia pronto ad incominciare l'elaborazione appena il segnale di {\it start} commuta a 1.
+
+\subsection{Stato \texttt{W\_CLOCK}}
+Essendo la transizione tra stati sincronizzata con il fronte di discesa del clock e non avendo la certezza che tra il segnale di {\it reset} e quello di {\it start} sia passato almeno un ciclo di clock, questo stato serve ad assicurare un output della memoria corretto.
+
+\subsection{Stato \texttt{R\_MASK}}
+In questo stato viene letta la maschera in ingresso, sulla quale è però necessario fare delle considerazioni.\\
+Per ottimizzare la {\it FSM} (in termini di tempo di esecuzione), è già possibile portare a termine l'elaborazione se
+
+\[Mask \in \{0 \lor 2^n, n\in[0,7]\}\]
+ovvero se la maschera contiene non più di un bit a 1.\cite{bit_hacks}
+\begin{minted}{vhdl}
+if unsigned(i_data and std_logic_vector(signed(i_data) - 1)) = 0 then
+    --la maschera contiene zero o un bit a 1.
+else
+    --la maschera contiene almeno due bit a 1.
+end if;
+\end{minted}
+in questo caso la maschera d'uscita sarà uguale a quella in ingresso.\bigskip\\
+Nel caso, invece, avessimo due o più centroidi da verificare bisognerà procedere con il calcolo della {\it Manhattan distance} di ognuno.
+
+\subsection{Stato \texttt{R\_X}}
+In questo stato viene letta la coordinata $x$ del centroide, in base allo step attuale.
+
+\[Addr_{x} = step * 2 + 1\]
+Lo step 8 si riferisce al centroide di riferimento.
+
+\subsection{Stato \texttt{R\_Y}}\label{r_y}
+In questo stato viene letta la coordinata $y$ del centroide, in base allo step attuale.
+
+\[Addr_{y} = step * 2 + 2\]
+Ad ogni {\it step}, ad esclusione di 8, si calcola la {\it Manhattan distance} con il riferimento
+\begin{minted}{vhdl}
+abs(to_integer(unsigned(x)) - to_integer(unsigned(c_x))) +
+abs(to_integer(unsigned(i_data)) - to_integer(unsigned(c_y)))
+
+-- x: coordiata x del centroide attuale
+-- c_x: coordiata x del centroide da valutare
+-- i_data: coordiata y del centroide attuale (non è necessario
+-- salvarne il valore)
+-- c_y: coordiata y del centroide da valutare
+\end{minted}
+e se la distanza è minore o uguale a quella più piccola calcolata finora la maschera d'uscita viene aggiornata di conseguenza.\bigskip\\
+Successivamente si incrementa {\it step} in modo da saltare i centroidi esclusi.
+\begin{minted}{vhdl}
+for i in 0 to 6 loop
+    if step < 8 and i_mask(step) = '0' then step := step + 1;
+    else exit;
+    end if;
+end loop;
+\end{minted}
+
+\subsection{Stato \texttt{DONE}}
+La computazione è stata completata e in memoria è stata scritta la maschera d'uscita, la {\it FSM} viene quindi riportata in \texttt{W\_CLOCK} pronta per incominciare un'altra elaborazione.
+
+\chapter{Risultati}
+Il componente supera correttamente la simulazione in {\it Behavioral} e {\it Post-Syntesis}, inoltre non presenta {\it warning}.
+
+\section{Testbench}
+Per testare il componente, oltre a il test fornito come esempio, ho realizzato un programma in C che realizzasse dei test per i casi limite, oltre che a una serie di test casuali.\\
+I casi limite includono le seguenti maschere in ingresso: \texttt{00000000}, \texttt{10000000}, \texttt{00000001}, \texttt{11111111}, \texttt{00010000}.
+\begin{minted}{c}
+int mem[20];
+int min = 511;
+srand(time(0));
+for (int i = 0; i < 19; i++) mem[i] = rand() % 256;
+for (int i = 0; i < 8; i++) if (mem[0] & 1 << i == 1 << i) {
+    int dist = abs(mem[17] - mem[i * 2 + 1]) + 
+               abs(mem[18] - mem[i * 2 + 2]);
+    if (dist < min) {
+        min = dist;
+        mem[19] = 1 << i;
+    } else if (dist == min) mem[19] += 1 << i;
+}
+
+//successivamente il risultato viene scritto su file vhd, pronto
+//per essere importato in vidado
+\end{minted}
+
+\newpage
+\section{Efficenza}
+Il componente ha la massima efficenza in termini di cicli di clock richiesti all'elaborazione del risultato, infatti esso termina l'elaborazione in
+
+\[Cicli(n) =
+\left\{
+  \begin{array}{lr}
+    2 * n + 4&: n\in[2,7]\\
+    2&: n\in[0,1]\\
+  \end{array}
+\right.\]
+dove $n$ è il numero di centroidi da considerare.
+
+\begin{center}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c||c|}
+        \hline
+        $Componente$&$Utilizzo$\\
+        \hline
+        LUT&125\\
+        FF&73\\
+        BUFG&1\\
+        \hline
+    \end{tabular}
+    \caption{Utilizzo componenti FPGA}
+\end{table}
+\end{center}
+
+\bibliography{main}{}
+\bibliographystyle{siam}
+\addcontentsline{toc}{chapter}{Bibliografia}
+\end{document}
